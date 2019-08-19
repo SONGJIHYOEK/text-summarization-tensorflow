@@ -1,4 +1,4 @@
-from nltk.tokenize import word_tokenize
+#from nltk.tokenize import word_tokenize
 import re
 import collections
 import pickle
@@ -6,13 +6,18 @@ import numpy as np
 from gensim.models.keyedvectors import KeyedVectors
 from gensim.test.utils import get_tmpfile
 from gensim.scripts.glove2word2vec import glove2word2vec
+import pandas as pd
 
+#train_article_path = "sumdata/train/train.article.txt"
+#train_title_path = "sumdata/train/train.title.txt"
+#valid_article_path = "sumdata/train/valid.article.filter.txt"
+#valid_title_path = "sumdata/train/valid.title.filter.txt"
 
-train_article_path = "sumdata/train/train.article.txt"
-train_title_path = "sumdata/train/train.title.txt"
-valid_article_path = "sumdata/train/valid.article.filter.txt"
-valid_title_path = "sumdata/train/valid.title.filter.txt"
+train_df = pd.read_csv('cnn_stories_train.csv').dropna()
+val_df = pd.read_csv('cnn_stories_val.csv').dropna()
 
+train_df = train_df[:15000]
+val_df = val_df[:2000]
 
 def clean_str(sentence):
     sentence = re.sub("[#.]+", "#", sentence)
@@ -29,12 +34,12 @@ def get_text_list(data_path, toy):
 
 def build_dict(step, toy=False):
     if step == "train":
-        train_article_list = get_text_list(train_article_path, toy)
-        train_title_list = get_text_list(train_title_path, toy)
+        train_article_list = list(train_df['story']) #get_text_list(train_article_path, toy)
+        train_title_list = list(train_df['highlights']) #get_text_list(train_title_path, toy)
 
         words = list()
         for sentence in train_article_list + train_title_list:
-            for word in word_tokenize(sentence):
+            for word in sentence.split():#word_tokenize(sentence):
                 words.append(word)
 
         word_counter = collections.Counter(words).most_common()
@@ -63,14 +68,17 @@ def build_dict(step, toy=False):
 
 def build_dataset(step, word_dict, article_max_len, summary_max_len, toy=False):
     if step == "train":
-        article_list = get_text_list(train_article_path, toy)
-        title_list = get_text_list(train_title_path, toy)
+        article_list = list(train_df['story']) #get_text_list(train_article_path, toy)
+        title_list = list(train_df['highlights']) #get_text_list(train_title_path, toy)
     elif step == "valid":
-        article_list = get_text_list(valid_article_path, toy)
+        article_list = list(val_df['story']) #get_text_list(valid_article_path, toy)
     else:
         raise NotImplementedError
 
-    x = [word_tokenize(d) for d in article_list]
+    #x = [d.split() for d in article_list] #[word_tokenize(d) for d in article_list]
+    x = []
+    for article in article_list:
+        x.append(article.split())
     x = [[word_dict.get(w, word_dict["<unk>"]) for w in d] for d in x]
     x = [d[:article_max_len] for d in x]
     x = [d + (article_max_len - len(d)) * [word_dict["<padding>"]] for d in x]
@@ -78,7 +86,10 @@ def build_dataset(step, word_dict, article_max_len, summary_max_len, toy=False):
     if step == "valid":
         return x
     else:        
-        y = [word_tokenize(d) for d in title_list]
+        #y = [word_tokenize(d) for d in title_list]
+        y = []
+        for title in title_list:
+            y.append(title.split())
         y = [[word_dict.get(w, word_dict["<unk>"]) for w in d] for d in y]
         y = [d[:(summary_max_len - 1)] for d in y]
         return x, y
